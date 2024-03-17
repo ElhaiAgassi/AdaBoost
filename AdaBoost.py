@@ -105,3 +105,40 @@ true_error = calculate_error(y_test, y_test_pred)
 
 print(f"Empirical Error: {empirical_error}")
 print(f"True Error: {true_error}")
+
+
+def multiple_adaboost_runs(file_path, runs=50, T=8):
+    all_empirical_errors = np.zeros((runs, T))
+    all_true_errors = np.zeros((runs, T))
+
+    for run in range(runs):
+        train_data, test_data = load_and_split_data(file_path)
+        X_train = train_data[:, :2]
+        y_train = train_data[:, 2]
+        X_test = test_data[:, :2]
+        y_test = test_data[:, 2]
+
+        models, alphas = adaboost(X_train, y_train, T)
+
+        for k in range(1, T+1):
+            y_train_pred = predict(models[:k], alphas[:k], X_train)
+            y_test_pred = predict(models[:k], alphas[:k], X_test)
+
+            empirical_error = calculate_error(y_train, y_train_pred)
+            true_error = calculate_error(y_test, y_test_pred)
+
+            all_empirical_errors[run, k-1] = empirical_error
+            all_true_errors[run, k-1] = true_error
+
+    average_empirical_errors = np.mean(all_empirical_errors, axis=0)
+    average_true_errors = np.mean(all_true_errors, axis=0)
+
+    return average_empirical_errors, average_true_errors
+
+
+average_empirical_errors, average_true_errors = multiple_adaboost_runs(
+    file_path)
+
+for k in range(8):
+    print(
+        f"k={k+1}: Average Empirical Error = {average_empirical_errors[k]}, Average True Error = {average_true_errors[k]}")
