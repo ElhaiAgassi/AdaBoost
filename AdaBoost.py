@@ -61,7 +61,7 @@ def generate_hypotheses(points, classifier_type):
     return hypotheses
 
 
-def adaboost(X, y, R=20, classifier_type='line'):
+def adaboost(X, y, R=8, classifier_type='line'):
     """
     Performs the AdaBoost algorithm to boost weak classifiers (line or circle).
 
@@ -74,7 +74,7 @@ def adaboost(X, y, R=20, classifier_type='line'):
     Returns:
     - A list of models (hypotheses) and their corresponding weights (alphas).
     """
-    # logging.info("Starting AdaBoost with classifier type: %s", classifier_type)
+    logging.info("Starting AdaBoost with classifier type: %s", classifier_type)
     n_samples = len(X)
     # Initialize weights evenly across all samples
     weights = np.full(n_samples, 1/n_samples)
@@ -82,7 +82,7 @@ def adaboost(X, y, R=20, classifier_type='line'):
     alphas = []
 
     for r in range(R):
-        # logging.info("AdaBoost iteration: %d", r + 1)
+        logging.info("AdaBoost iteration: %d", r + 1)
         hypotheses = generate_hypotheses(X, classifier_type)
         errors = np.zeros(len(hypotheses))
 
@@ -212,7 +212,7 @@ def multiple_adaboost_runs(file_path, runs=50, R=8, classifier_type='line'):
     average_empirical_errors = np.mean(all_empirical_errors, axis=0)
     average_true_errors = np.mean(all_true_errors, axis=0)
 
-    return average_empirical_errors, average_true_errors
+    return average_empirical_errors, average_true_errors, models, alphas
 
 
 def visualize_adaboost_results(S, models, alphas, classifier_type):
@@ -226,50 +226,34 @@ def visualize_adaboost_results(S, models, alphas, classifier_type):
     plt.ylim(-2.5, 2.5)
 
     if classifier_type == 'circle':
-        # Determine the alpha threshold to visualize significant circles
-        # You might want to adjust this threshold based on your specific dataset
-        alpha_threshold = np.mean(alphas)  # For example, set to mean of alphas
 
         # Plot each circle with alpha greater than the threshold
         for model, alpha in zip(models, alphas):
-            if alpha > alpha_threshold:
-                type, params = model
-                if type == 'circle':
-                    center, radius = params
-                    circle = plt.Circle(center, radius, color='r',
-                                        fill=False, alpha=min(alpha * 10, 1))
-                    plt.gca().add_artist(circle)
+            type, params = model
+            if type == 'circle':
+                center, radius = params
+                circle = plt.Circle(center, radius, color='r', fill=False)
+                plt.gca().add_artist(circle)
 
     plt.xlabel('X1')
     plt.ylabel('X2')
-    plt.title('AdaBoost Significant Circle Classifiers')
+    plt.title('AdaBoost Classification')
     plt.gca().set_aspect('equal', adjustable='box')  # Keep the aspect ratio square
     plt.show()
 
 
 # Example usage
 classifier_type = 'circle'  # Option to change to 'line', 'circle'
-average_empirical_errors, average_true_errors = multiple_adaboost_runs(
+average_empirical_errors, average_true_errors, models, alphas = multiple_adaboost_runs(
     file_path, classifier_type=classifier_type)
 
 for k in range(8):
     print(
         f"k={k+1}, Classifier Type: {classifier_type}: Average Empirical Error = {average_empirical_errors[k]}, Average True Error = {average_true_errors[k]}")
 
-# Demonstrate loading data, training AdaBoost, and making predictions
-train_data, test_data = load_and_split_data(file_path)
-X_train, y_train = train_data[:, :2], train_data[:, 2]
-X_test, y_test = test_data[:, :2], test_data[:, 2]
-
-# Train the AdaBoost model
-models, alphas = adaboost(X_train, y_train, T=8,
-                          classifier_type=classifier_type)
-logging.info("AdaBoost training completed.")
-
-visualize_adaboost_results(train_data, models, alphas, classifier_type)
-
-# Make predictions on the test set
-y_test_pred = predict(models, alphas, X_test)
+# Assuming models and alphas are from the last run of multiple_adaboost_runs
+visualize_adaboost_results(S=train_data, models=models,
+                           alphas=alphas, classifier_type=classifier_type)
 
 # Calculate and print the test error
 test_error = calculate_error(y_test, y_test_pred)
