@@ -95,14 +95,13 @@ def adaboost(X, y, T=20, classifier_type='line'):
         for i, hypothesis in enumerate(hypotheses):
             predictions = np.array(
                 [classify_point(hypothesis, X[j]) for j in range(n_samples)])
-            errors[i] = np.sum(weights[(y != predictions)]
-                               * weights[(y != predictions)])
+            errors[i] = np.sum(weights[y != predictions])
         best_hypothesis_idx = np.argmin(errors)
         best_hypothesis = hypotheses[best_hypothesis_idx]
+        models.append(best_hypothesis)
         best_error = errors[best_hypothesis_idx]
         # Compute weight (alpha) for the selected hypothesis
         alpha = 0.5 * np.log((1 - best_error) / (best_error + 1e-10))
-        models.append(best_hypothesis)
         alphas.append(alpha)
 
         # Update sample weights for the next iteration
