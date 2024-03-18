@@ -66,6 +66,52 @@ def generate_hypotheses(points, classifier_type, sample_size=10):
     return hypotheses
 
 
+def adaboost(X, y, T=20, classifier_type='line'):
+    """
+    Performs the AdaBoost algorithm to boost weak classifiers (line or circle).
+
+    Args:
+    - X: Feature set (points).
+    - y: Labels for each point.
+    - T: Number of boosting rounds.
+    - classifier_type: Type of weak classifier ('line', 'circle').
+
+    Returns:
+    - A list of models (hypotheses) and their corresponding weights (alphas).
+    """
+    # logging.info("Starting AdaBoost with classifier type: %s", classifier_type)
+    n_samples = len(X)
+    # Initialize weights evenly across all samples
+    weights = np.full(n_samples, 1/n_samples)
+    models = []
+    alphas = []
+
+    for t in range(T):
+        # logging.info("AdaBoost iteration: %d", t + 1)
+        hypotheses = generate_hypotheses(X, classifier_type)
+        errors = np.zeros(len(hypotheses))
+
+        # Evaluate and select the best hypothesis based on weighted error
+        for i, hypothesis in enumerate(hypotheses):
+            predictions = np.array(
+                [classify_point(hypothesis, X[j]) for j in range(n_samples)])
+            errors[i] = np.sum(weights[(y != predictions)]
+                               * weights[(y != predictions)])
+        best_hypothesis_idx = np.argmin(errors)
+        best_hypothesis = hypotheses[best_hypothesis_idx]
+        best_error = errors[best_hypothesis_idx]
+        # Compute weight (alpha) for the selected hypothesis
+        alpha = 0.5 * np.log((1 - best_error) / (best_error + 1e-10))
+        models.append(best_hypothesis)
+        alphas.append(alpha)
+
+        # Update sample weights for the next iteration
+        weights *= np.exp(-alpha * y * predictions)
+        weights /= np.sum(weights)
+
+    return models, alphas
+
+
 def classify_point(hypothesis, point):
     """
     Classifies a point as inside or outside (1 or -1) based on a given hypothesis.
@@ -87,121 +133,6 @@ def classify_point(hypothesis, point):
         # Classify based on distance to the circle's center
         distance = np.linalg.norm(point[:2] - center)
         return 1 if distance <= radius else -1
-
-
-def adaboost(X, y, T=8, classifier_type='line'):
-    """
-    Performs the AdaBoost algorithm to boost weak classifiers (line or circle).
-
-    Args:
-    - X: Feature set (points).
-    - y: Labels for each point.
-    - T: Number of boosting rounds.
-    - classifier_type: Type of weak classifier ('line', 'circle', or 'both').
-
-    Returns:
-    - A list of models (hypotheses) and their corresponding weights (alphas).
-    """
-    logging.info("Starting AdaBoost with classifier type: %s", classifier_type)
-    n_samples = len(X)
-    # Initialize weights evenly across all samples
-    weights = np.full(n_samples, 1/n_samples)
-    models = []
-    alphas = []
-
-    for t in range(T):
-        logging.info("AdaBoost iteration: %d", t + 1)
-        hypotheses = generate_hypotheses(X, classifier_type)
-        errors = np.ones(len(hypotheses))
-
-        # Evaluate and select the best hypothesis based on weighted error
-        for i, hypothesis in enumerate(hypotheses):
-            predictions = np.array(
-                [classify_point(hypothesis, X[j]) for j in range(n_samples)])
-            errors[i] = np.sum(weights[y != predictions])
-        best_hypothesis_idx = np.argmin(errors)
-        best_hypothesis = hypotheses[best_hypothesis_idx]
-        best_error = errors[best_hypothesis_idx]
-        # Compute weight (alpha) for the selected hypothesis
-        alpha = 0.5 * np.log((1 - best_error) / (best_error + 1e-10))
-        models.append(best_hypothesis)
-        alphas.append(alpha)
-
-        # Update sample weights for the next iteration
-        weights *= np.exp(-alpha * y * predictions)
-        weights /= np.sum(weights)
-
-    return models, alphas
-
-
-def classify_point(hypothesis, point):
-    """
-    Classifies a point based on a given hypothesis. The hypothesis can be either a line or a circle.
-
-    Parameters:
-    - hypothesis: A tuple containing the hypothesis type ('line' or 'circle') and its parameters.
-    - point: The (x, y) coordinates of the point to classify.
-
-    Returns:
-    - Classification result: 1 for a positive classification, -1 for a negative classification.
-    """
-    type, model = hypothesis
-    if type == 'line':
-        # Line classification based on the line equation ax + by + c
-        a, b, c = model
-        return 1 if a*point[0] + b*point[1] + c > 0 else -1
-    elif type == 'circle':
-        # Circle classification based on whether the point is inside or outside the circle
-        center, radius = model
-        distance = np.sqrt((point[0] - center[0]) **
-                           2 + (point[1] - center[1])**2)
-        return 1 if distance <= radius else -1
-
-
-def adaboost(X, y, T=8, classifier_type='line'):
-    """
-    Performs the AdaBoost algorithm to combine weak classifiers into a stronger classifier.
-
-    Parameters:
-    - X: Feature set.
-    - y: Labels.
-    - T: Number of boosting rounds.
-    - classifier_type: Type of classifiers to use ('line', 'circle', or 'both').
-
-    Returns:
-    - models: The selected models (hypotheses) in each round.
-    - alphas: The weight of each selected model.
-    """
-    n_samples = len(X)
-    weights = np.full(n_samples, 1/n_samples)  # Initialize weights evenly
-    models = []
-    alphas = []
-
-    # Iteratively build the AdaBoost model
-    for t in range(T):
-        hypotheses = generate_hypotheses(X, classifier_type)
-        errors = np.ones(len(hypotheses))
-
-        # Evaluate and select the best hypothesis based on weighted error
-        for i, hypothesis in enumerate(hypotheses):
-            predictions = np.array(
-                [classify_point(hypothesis, X[j]) for j in range(n_samples)])
-            errors[i] = np.sum(weights[y != predictions])
-
-        best_hypothesis_idx = np.argmin(errors)
-        best_hypothesis = hypotheses[best_hypothesis_idx]
-        best_error = errors[best_hypothesis_idx]
-
-        # Compute the model weight (alpha) from the error rate
-        alpha = 0.5 * np.log((1.0 - best_error) / (best_error + 1e-10))
-        models.append(best_hypothesis)
-        alphas.append(alpha)
-
-        # Update the data weights for the next iteration
-        weights *= np.exp(-alpha * y * predictions)
-        weights /= np.sum(weights)
-
-    return models, alphas
 
 
 def predict(models, alphas, X):
@@ -241,7 +172,7 @@ def calculate_error(y_true, y_pred):
     return np.mean(y_true != y_pred)
 
 
-def multiple_adaboost_runs(file_path, runs=50, T=8, classifier_type='line'):
+def multiple_adaboost_runs(file_path, runs=50, T=20, classifier_type='line'):
     """
     Executes multiple runs of the AdaBoost algorithm to average out errors.
 
@@ -336,7 +267,7 @@ def visualize_adaboost_results(S, models, classifier_type):
 
 
 # Example usage
-classifier_type = 'both'  # Option to change to 'line', 'circle', or 'both'
+classifier_type = 'circle'  # Option to change to 'line', 'circle'
 average_empirical_errors, average_true_errors = multiple_adaboost_runs(
     file_path, classifier_type=classifier_type)
 
