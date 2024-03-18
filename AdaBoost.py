@@ -215,7 +215,12 @@ def multiple_adaboost_runs(file_path, runs=50, R=8, classifier_type='line'):
     return average_empirical_errors, average_true_errors, models, alphas
 
 
-def visualize_adaboost_results(S, models, alphas, classifier_type):
+# Example usage
+
+# Assuming the rest of the functions (load_and_split_data, generate_hypotheses, adaboost, classify_point, predict, calculate_error) are defined above.
+
+
+def visualize_adaboost_results(S, models, classifier_type):
     # Plot all points
     for point in S:
         plt.scatter(point[0], point[1],
@@ -226,37 +231,35 @@ def visualize_adaboost_results(S, models, alphas, classifier_type):
     plt.ylim(-2.5, 2.5)
 
     if classifier_type == 'circle':
-
-        # Plot each circle with alpha greater than the threshold
-        for model, alpha in zip(models, alphas):
-            type, params = model
+        # Plot each circle
+        for model in models:
+            type, (center, radius) = model
             if type == 'circle':
-                center, radius = params
                 circle = plt.Circle(center, radius, color='r', fill=False)
                 plt.gca().add_artist(circle)
 
     plt.xlabel('X1')
     plt.ylabel('X2')
     plt.title('AdaBoost Classification')
-    plt.gca().set_aspect('equal', adjustable='box')  # Keep the aspect ratio square
+    plt.gca().set_aspect('equal', adjustable='box')
     plt.show()
 
 
-# Example usage
+# Setup basic logging for monitoring the progress
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+
+file_path = "circle_separator.txt"  # Path to the dataset file
 classifier_type = 'circle'  # Option to change to 'line', 'circle'
 average_empirical_errors, average_true_errors, models, alphas = multiple_adaboost_runs(
-    file_path, classifier_type=classifier_type)
+    file_path, runs=50, R=8, classifier_type=classifier_type)
 
+# Print average errors for insight
 for k in range(8):
     print(
-        f"k={k+1}, Classifier Type: {classifier_type}: Average Empirical Error = {average_empirical_errors[k]}, Average True Error = {average_true_errors[k]}")
+        f"k={k+1}, Classifier Type: {classifier_type}, Average Empirical Error = {average_empirical_errors[k]}, Average True Error = {average_true_errors[k]}")
 
-# Assuming models and alphas are from the last run of multiple_adaboost_runs
-visualize_adaboost_results(S=train_data, models=models,
-                           alphas=alphas, classifier_type=classifier_type)
-
-# Calculate and print the test error
-test_error = calculate_error(y_test, y_test_pred)
-print(f"Test Error for '{classifier_type}' classifier: {test_error}")
-
-logging.info("AdaBoost example run completed.")
+# Visualize the results using the models and alphas from the last AdaBoost run
+# Get the last train data used for visualization
+train_data, _ = load_and_split_data(file_path)
+visualize_adaboost_results(train_data, models, classifier_type)
