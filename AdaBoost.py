@@ -22,27 +22,22 @@ def load_and_split_data(file_path):
     return train_data, test_data
 
 
-def generate_hypotheses(points, classifier_type, sample_size=10):
+def generate_hypotheses(points, classifier_type):
     """
     Generates a list of hypotheses (lines or circles) based on the input points.
-    The function can selectively generate lines, circles, or both, depending on
-    the classifier_type argument. It also samples a subset of points to reduce
-    computational load.
+    The function can selectively generate lines or circles depending on
+    the classifier_type argument.
 
     Args:
     - points: Array of points to be used for generating hypotheses.
-    - classifier_type: A string indicating the type of classifier ('line', 'circle', or 'both').
-    - sample_size: The number of points to sample for hypothesis generation.
+    - classifier_type: A string indicating the type of classifier ('line' or 'circle').
 
     Returns:
     - A list of tuples where each tuple contains a classifier type and its parameters.
     """
-    # Sample points to reduce the number of generated hypotheses
-    points = points[np.random.choice(
-        points.shape[0], sample_size, replace=False)]
     hypotheses = []
     # Generate line hypotheses
-    if classifier_type in ['line', 'both']:
+    if classifier_type == 'line':
         # logging.info("Generating line hypotheses")
         for i in range(len(points)):
             for j in range(i + 1, len(points)):
@@ -54,7 +49,7 @@ def generate_hypotheses(points, classifier_type, sample_size=10):
                 c = x2*y1 - x1*y2
                 hypotheses.append(('line', (a, b, c)))
     # Generate circle hypotheses
-    if classifier_type in ['circle', 'both']:
+    if classifier_type == 'circle':
         # logging.info("Generating circle hypotheses")
         for i in range(len(points)):
             for j in range(i + 1, len(points)):
@@ -66,14 +61,14 @@ def generate_hypotheses(points, classifier_type, sample_size=10):
     return hypotheses
 
 
-def adaboost(X, y, T=20, classifier_type='line'):
+def adaboost(X, y, R=20, classifier_type='line'):
     """
     Performs the AdaBoost algorithm to boost weak classifiers (line or circle).
 
     Args:
     - X: Feature set (points).
     - y: Labels for each point.
-    - T: Number of boosting rounds.
+    - R: Number of boosting rounds.
     - classifier_type: Type of weak classifier ('line', 'circle').
 
     Returns:
@@ -86,8 +81,8 @@ def adaboost(X, y, T=20, classifier_type='line'):
     models = []
     alphas = []
 
-    for t in range(T):
-        # logging.info("AdaBoost iteration: %d", t + 1)
+    for r in range(R):
+        # logging.info("AdaBoost iteration: %d", r + 1)
         hypotheses = generate_hypotheses(X, classifier_type)
         errors = np.zeros(len(hypotheses))
 
@@ -96,16 +91,20 @@ def adaboost(X, y, T=20, classifier_type='line'):
             predictions = np.array(
                 [classify_point(hypothesis, X[j]) for j in range(n_samples)])
             errors[i] = np.sum(weights[y != predictions])
+
         best_hypothesis_idx = np.argmin(errors)
         best_hypothesis = hypotheses[best_hypothesis_idx]
         models.append(best_hypothesis)
         best_error = errors[best_hypothesis_idx]
+
         # Compute weight (alpha) for the selected hypothesis
         alpha = 0.5 * np.log((1 - best_error) / (best_error + 1e-10))
         alphas.append(alpha)
+        best_predictions = np.array(
+            [classify_point(best_hypothesis, X[j]) for j in range(n_samples)])
 
         # Update sample weights for the next iteration
-        weights *= np.exp(-alpha * y * predictions)
+        weights *= np.exp(-alpha * y * best_predictions)
         weights /= np.sum(weights)
 
     return models, alphas
@@ -171,22 +170,22 @@ def calculate_error(y_true, y_pred):
     return np.mean(y_true != y_pred)
 
 
-def multiple_adaboost_runs(file_path, runs=50, T=20, classifier_type='line'):
+def multiple_adaboost_runs(file_path, runs=50, R=8, classifier_type='line'):
     """
     Executes multiple runs of the AdaBoost algorithm to average out errors.
 
     Parameters:
     - file_path: Path to the dataset.
     - runs: Number of runs.
-    - T: Number of boosting rounds in each run.
+    - R: Number of boosting rounds in each run.
     - classifier_type: Type of classifiers to use ('line', 'circle', or 'both').
 
     Returns:
     - average_empirical_errors: The average training error across all runs.
     - average_true_errors: The average test error across all runs.
     """
-    all_empirical_errors = np.zeros((runs, T))
-    all_true_errors = np.zeros((runs, T))
+    all_empirical_errors = np.zeros((runs, R))
+    all_true_errors = np.zeros((runs, R))
 
     # Perform multiple runs of AdaBoost
     for run in range(runs):
@@ -196,10 +195,10 @@ def multiple_adaboost_runs(file_path, runs=50, T=20, classifier_type='line'):
         X_test = test_data[:, :2]
         y_test = test_data[:, 2]
 
-        models, alphas = adaboost(X_train, y_train, T, classifier_type)
+        models, alphas = adaboost(X_train, y_train, R, classifier_type)
 
         # Calculate errors for each round of boosting
-        for k in range(1, T+1):
+        for k in range(1, R+1):
             y_train_pred = predict(models[:k], alphas[:k], X_train)
             y_test_pred = predict(models[:k], alphas[:k], X_test)
 
@@ -216,15 +215,7 @@ def multiple_adaboost_runs(file_path, runs=50, T=20, classifier_type='line'):
     return average_empirical_errors, average_true_errors
 
 
-def visualize_adaboost_results(S, models, classifier_type):
-    """
-    Visualizes the data points and the best hypotheses generated by the AdaBoost algorithm.
-
-    Parameters:
-    - S: The dataset containing points and their labels.
-    - models: The list of models (hypotheses) generated by AdaBoost.
-    - classifier_type: Type of classifiers used ('line', 'circle', or 'both').
-    """
+def visualize_adaboost_results(S, models, alphas, classifier_type):
     # Plot all points
     for point in S:
         plt.scatter(point[0], point[1],
@@ -234,33 +225,24 @@ def visualize_adaboost_results(S, models, classifier_type):
     plt.xlim(-2.5, 2.5)
     plt.ylim(-2.5, 2.5)
 
-    if classifier_type in ['line', 'both']:
-        # Plot each line
-        x_values = np.linspace(-2.5, 2.5, 400)
-        for model in models:
-            type, params = model
-            if type == 'line':
-                a, b, c = params
-                # Avoid division by zero in case of vertical line
-                if b != 0:
-                    y_values = (-a * x_values - c) / b
-                    plt.plot(x_values, y_values, '-r')
-                else:
-                    x_val = -c / a
-                    plt.axvline(x=x_val)
+    if classifier_type == 'circle':
+        # Determine the alpha threshold to visualize significant circles
+        # You might want to adjust this threshold based on your specific dataset
+        alpha_threshold = np.mean(alphas)  # For example, set to mean of alphas
 
-    if classifier_type in ['circle', 'both']:
-        # Plot each circle
-        for model in models:
-            type, params = model
-            if type == 'circle':
-                center, radius = params
-                circle = plt.Circle(center, radius, color='r', fill=False)
-                plt.gca().add_artist(circle)
+        # Plot each circle with alpha greater than the threshold
+        for model, alpha in zip(models, alphas):
+            if alpha > alpha_threshold:
+                type, params = model
+                if type == 'circle':
+                    center, radius = params
+                    circle = plt.Circle(center, radius, color='r',
+                                        fill=False, alpha=min(alpha * 10, 1))
+                    plt.gca().add_artist(circle)
 
     plt.xlabel('X1')
     plt.ylabel('X2')
-    plt.title('AdaBoost Classification')
+    plt.title('AdaBoost Significant Circle Classifiers')
     plt.gca().set_aspect('equal', adjustable='box')  # Keep the aspect ratio square
     plt.show()
 
@@ -284,7 +266,7 @@ models, alphas = adaboost(X_train, y_train, T=8,
                           classifier_type=classifier_type)
 logging.info("AdaBoost training completed.")
 
-visualize_adaboost_results(train_data, models, classifier_type)
+visualize_adaboost_results(train_data, models, alphas, classifier_type)
 
 # Make predictions on the test set
 y_test_pred = predict(models, alphas, X_test)
