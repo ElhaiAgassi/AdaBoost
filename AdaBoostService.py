@@ -45,21 +45,22 @@ class AdaBoostService:
     def predict(self, classifier, data, classifier_type):
         if classifier_type == 'line':
             point1, point2 = classifier
-            determinant = (point2[0] - point1[0]) * (data[1] - point1[1]) - (point2[1] - point1[1]) * (data[0] - point1[0])
-            return 1 if determinant > 0 else -1
+            cross_product = np.cross([point2[0] - point1[0], point2[1] - point1[1]], [data[0] - point1[0], data[1] - point1[1]])
+            return 1 if cross_product > 0 else -1
         elif classifier_type == 'circle':
             center, radius_point = classifier
-            radius = ((radius_point[0] - center[0])**2 + (radius_point[1] - center[1])**2)**0.5
-            distance = ((data[0] - center[0])**2 + (data[1] - center[1])**2)**0.5
+            radius = np.linalg.norm(np.array(radius_point) - np.array(center))
+            distance = np.linalg.norm(np.array(data) - np.array(center))
             return 1 if distance <= radius else -1
 
     def aggregate_predictions(self, test_data, classifiers, alphas, classifier_type):
-        final_predictions = []
-        for data in test_data:
-            weighted_sum = sum(alpha * self.predict(classifier, data, classifier_type) for classifier, alpha in zip(classifiers, alphas))
-            final_label = 1 if weighted_sum > 0 else -1
-            final_predictions.append((data, final_label))
-        return final_predictions
+        weighted_sums = np.zeros(len(test_data))
+        for classifier, alpha in zip(classifiers, alphas):
+            predictions = np.array([self.predict(classifier, data, classifier_type) for data in test_data])
+            weighted_sums += alpha * predictions
+
+        final_labels = np.sign(weighted_sums)
+        return [(data, label) for data, label in zip(test_data, final_labels)]
 
     def calculate_accuracy(self, predictions):
         correct = sum(1 for data, predicted in predictions if data[2] == predicted)
