@@ -1,3 +1,4 @@
+from matplotlib import pyplot as plt
 import numpy as np
 from itertools import product
 import random
@@ -52,8 +53,8 @@ class AdaBoostService:
             return 1 if determinant > 0 else -1
         elif classifier_type == 'circle':
             center, radius_point = classifier
-            radius = np.sqrt((radius_point[0] - center[0])**2 + (radius_point[1] - center[1])**2)
-            distance = np.sqrt((data[0] - center[0])**2 + (data[1] - center[1])**2)
+            radius = ((radius_point[0] - center[0])**2 + (radius_point[1] - center[1])**2)**0.5
+            distance = ((data[0] - center[0])**2 + (data[1] - center[1])**2)**0.5
             return 1 if distance <= radius else -1
 
     def aggregate_predictions(self, test_data, classifiers, alphas, classifier_type):
@@ -78,3 +79,37 @@ class AdaBoostService:
         true_accuracy = self.calculate_accuracy(test_predictions)
 
         return 1 - empirical_accuracy, 1 - true_accuracy
+
+    def visualize(self, dataset, classifiers, classifier_type):
+        # Convert dataset to a NumPy array for easier indexing
+        dataset_np = np.array(dataset)
+
+        # First, plot the dataset points
+        for point in dataset_np:
+            plt.scatter(point[0], point[1], color='red' if point[2] == 1 else 'blue')
+
+        # Now plot the classifiers based on type
+        if classifier_type == 'line':
+            for classifier in classifiers:
+                point1, point2 = classifier
+                # Handle the case for vertical lines to avoid division by zero
+                if point1[0] == point2[0]:
+                    plt.axvline(x=point1[0], color='green')
+                else:
+                    slope = (point2[1] - point1[1]) / (point2[0] - point1[0])
+                    intercept = point1[1] - slope * point1[0]
+                    x_values = np.linspace(dataset_np[:,0].min(), dataset_np[:,0].max(), 100)
+                    y_values = slope * x_values + intercept
+                    plt.plot(x_values, y_values, '-g')
+        elif classifier_type == 'circle':
+            for classifier in classifiers:
+                center, point_on_circle = classifier
+                radius = np.sqrt((point_on_circle[0] - center[0])**2 + (point_on_circle[1] - center[1])**2)
+                circle = plt.Circle(center, radius, color='green', fill=False)
+                plt.gca().add_artist(circle)
+
+        plt.xlabel('X1')
+        plt.ylabel('X2')
+        plt.title(f'AdaBoost Classification with {classifier_type}')
+        plt.gca().set_aspect('equal', adjustable='box')  # Keep the aspect ratio square
+        plt.show()
