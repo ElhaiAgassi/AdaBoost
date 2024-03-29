@@ -17,18 +17,15 @@ class AdaBoostService:
         return dataset
 
     def split_dataset(self, dataset: list) -> tuple:
-        """Randomly splits the dataset into two subsets."""
         random.shuffle(dataset)
         split_point = int(len(dataset) * 0.5)
         return dataset[:split_point], dataset[split_point:]
 
     def initialize_weights(self, dataset: list) -> dict:
-        """Initializes and returns weights for each item in the dataset."""
         initial_weight = 1.0 / len(dataset)
         return {data: initial_weight for data in dataset}
 
     def generate_classifiers(self, dataset: list, classifier_type: str) -> list:
-        """Generates and returns possible classifiers based on data combinations."""
         if classifier_type == 'line':
             return list(product(dataset, repeat=2))
         elif classifier_type == 'circle':
@@ -46,7 +43,6 @@ class AdaBoostService:
         return error, predictions
 
     def predict(self, classifier, data, classifier_type):
-        """Predicts the label of a given data point using the specified classifier."""
         if classifier_type == 'line':
             point1, point2 = classifier
             determinant = (point2[0] - point1[0]) * (data[1] - point1[1]) - (point2[1] - point1[1]) * (data[0] - point1[0])
@@ -58,7 +54,6 @@ class AdaBoostService:
             return 1 if distance <= radius else -1
 
     def aggregate_predictions(self, test_data, classifiers, alphas, classifier_type):
-        """Aggregates predictions from all classifiers for the test data."""
         final_predictions = []
         for data in test_data:
             weighted_sum = sum(alpha * self.predict(classifier, data, classifier_type) for classifier, alpha in zip(classifiers, alphas))
@@ -67,7 +62,6 @@ class AdaBoostService:
         return final_predictions
 
     def calculate_accuracy(self, predictions):
-        """Calculates the accuracy of predictions."""
         correct = sum(1 for data, predicted in predictions if data[2] == predicted)
         return correct / len(predictions)
 
@@ -113,3 +107,4 @@ class AdaBoostService:
         plt.title(f'AdaBoost Classification with {classifier_type}')
         plt.gca().set_aspect('equal', adjustable='box')  # Keep the aspect ratio square
         plt.show()
+

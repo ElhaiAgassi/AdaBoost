@@ -14,37 +14,40 @@ class AdaBoost:
 
         # Validate the shape type
         if shape_type not in ['line', 'circle']:
-            print("Error: shape_type must be 'line' or 'circle'.")
-            return
-
-        # Load and split dataset once
-        dataset = self.service.load_data(data_path)
-        training_data, test_data = self.service.split_dataset(dataset)
-
-        # Generate classifiers once
-        classifiers = self.service.generate_classifiers(training_data, shape_type)
+            raise ValueError("Error: shape_type must be 'line' or 'circle'.")
 
         # Arrays to store summed errors across all runs for averaging later
         summed_empirical_errors = np.zeros(total_runs)
         summed_true_errors = np.zeros(total_runs)
 
+        dataset = self.service.load_data(data_path)
+        training_data, test_data = self.service.split_dataset(dataset)
+
         for run in range(total_runs):
             weights = self.service.initialize_weights(training_data)
+            classifiers = self.service.generate_classifiers(training_data, shape_type)
+
             best_classifiers, alphas, empirical_errors, true_errors = [], [], [], []
 
             for i in range(iterations):
                 best_classifier, lowest_error, best_predictions = None, float('inf'), None
+
                 for classifier in classifiers:
                     error, predictions = self.service.evaluate_classifier(classifier, weights, training_data, shape_type)
+
                     if error < lowest_error:
                         lowest_error, best_classifier, best_predictions = error, classifier, predictions
+
                 alpha = 0.5 * np.log((1 - lowest_error) / (lowest_error + 1e-10))
                 alphas.append(alpha)
                 best_classifiers.append(best_classifier)
 
                 # Update weights for the next iteration
                 for data in training_data:
-                    weights[data] *= np.exp(-alpha * best_predictions[data] * data[2])
+                    weight_update = np.exp(-alpha * best_predictions[data] * data[2])
+                    weights[data] *= weight_update
+
+                # Normalize weights
                 normalization_factor = sum(weights.values())
                 weights = {data: weight / normalization_factor for data, weight in weights.items()}
 
