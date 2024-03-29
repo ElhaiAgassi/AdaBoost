@@ -1,104 +1,80 @@
 import numpy as np
-import matplotlib.pyplot as plt
+from itertools import product
+import random
 
+# Re-defining the AdaBoostService with necessary imports
 class AdaBoostService:
-    @staticmethod
-    def generate_hypotheses(X, classifier_type):
-        """Generate a list of hypotheses based on the classifier type (line or circle),
-        incorporating line hypothesis generation directly within this method."""
-        hypotheses = []
+    """A utility class providing supporting functions for the AdaBoost classifier."""
+
+    def load_data(self, file_path: str) -> list:
+        dataset = []
+        with open(file_path, 'r') as data_file:
+            for line in data_file:
+                x, y, label = line.strip().split()
+                x, y = float(x), float(y)
+                dataset.append((x, y, int(label)))
+        return dataset
+
+    def split_dataset(self, dataset: list) -> tuple:
+        """Randomly splits the dataset into two subsets."""
+        random.shuffle(dataset)
+        split_point = int(len(dataset) * 0.5)
+        return dataset[:split_point], dataset[split_point:]
+
+    def initialize_weights(self, dataset: list) -> dict:
+        """Initializes and returns weights for each item in the dataset."""
+        initial_weight = 1.0 / len(dataset)
+        return {data: initial_weight for data in dataset}
+
+    def generate_classifiers(self, dataset: list, classifier_type: str) -> list:
+        """Generates and returns possible classifiers based on data combinations."""
         if classifier_type == 'line':
-            for i in range(len(X)):
-                for j in range(i + 1, len(X)):
-                    # Directly generate line hypothesis here
-                    point1, point2 = X[i], X[j]
-                    a = point2[1] - point1[1]
-                    b = point1[0] - point2[0]
-                    c = point2[0] * point1[1] - point1[0] * point2[1]
-                    hypotheses.append(('line', (a, b, c)))
+            return list(product(dataset, repeat=2))
         elif classifier_type == 'circle':
-            for i in range(len(X)):
-                for j in range(i + 1, len(X)):
-                    center = X[i]
-                    radius_point = X[j]
-                    radius = np.linalg.norm(center - radius_point)
-                    hypotheses.append(('circle', (center, radius)))
-        return hypotheses
-    
-    @staticmethod
-    def evaluate_hypothesis(hypothesis, X, y, weights, classifier_type):
-        error = 0
-        predictions = np.zeros_like(y)
-        if classifier_type == 'line':
-            a, b, c = hypothesis[1]
-            predictions = np.sign(a * X[:, 0] + b * X[:, 1] + c)
-        elif classifier_type == 'circle':
-            center, radius = hypothesis[1]
-            distances = np.sqrt((X[:, 0] - center[0])**2 + (X[:, 1] - center[1])**2)
-            predictions = np.sign(distances - radius)
-        error = np.sum(weights[y != predictions])
+            return [(center, point) for center in dataset for point in dataset if center != point]
+
+    def evaluate_classifier(self, classifier, weights, dataset, classifier_type):
+        error, predictions = 0, {}
+        for data in dataset:
+            prediction = self.predict(classifier, data, classifier_type)
+            real_label = data[2]
+            predictions[data] = prediction
+            
+            if prediction != real_label:
+                error += weights[data]
         return error, predictions
 
-    @staticmethod
-    def update_weights(weights, alpha, y, predictions):
-        weights *= np.exp(-alpha * y * predictions)
-        weights /= np.sum(weights)  # Normalize
-        return weights
-
-    @staticmethod
-    def predict(models, alphas, X, classifier_type):
-        final_prediction = np.zeros(len(X))
-        for model, alpha in zip(models, alphas):
-            if classifier_type == 'line':
-                a, b, c = model[1]
-                predictions = np.sign(a * X[:, 0] + b * X[:, 1] + c)
-            elif classifier_type == 'circle':
-                center, radius = model[1]
-                distances = np.sqrt((X[:, 0] - center[0])**2 + (X[:, 1] - center[1])**2)
-                predictions = np.sign(distances - radius)
-            final_prediction += alpha * predictions
-        return np.sign(final_prediction)
-    
-    @staticmethod
-    def calculate_error(y_true, y_pred):
-            """Calculate the mean error rate between true labels and predicted labels."""
-            return np.mean(y_true != y_pred)
-    
-    @staticmethod
-    def load_and_split_data(file_path):
-        data = np.loadtxt(file_path, delimiter=None)
-        np.random.shuffle(data)
-        split_index = len(data) // 2
-        train_data, test_data = data[:split_index, :], data[split_index:, :]
-        return train_data, test_data
-    
-    @staticmethod
-    def visualize_best_hypotheses(X, y, models, classifier_type):
-        """Visualize the training data and overlay the best hypotheses."""
-        plt.figure(figsize=(8, 8))
-        # Plot data points, color-coded by their labels
-        for label, marker in zip([-1, 1], ['rx', 'bo']):
-            plt.scatter(X[y == label, 0], X[y == label, 1], marker=marker[1], color=marker[0], label=f"Class {label}")
-
-        # Define x range for plotting line equations
-        x_range = np.linspace(X[:, 0].min(), X[:, 0].max(), num=400)
-
+    def predict(self, classifier, data, classifier_type):
+        """Predicts the label of a given data point using the specified classifier."""
         if classifier_type == 'line':
-            for model in models:
-                a, b, c = model[1]
-                # Calculate y values based on the line equation ax + by + c = 0
-                y_range = (-a * x_range - c) / b
-                plt.plot(x_range, y_range, label=f"Line: {a:.2f}x + {b:.2f}y + {c:.2f} = 0")
+            point1, point2 = classifier
+            determinant = (point2[0] - point1[0]) * (data[1] - point1[1]) - (point2[1] - point1[1]) * (data[0] - point1[0])
+            return 1 if determinant > 0 else -1
         elif classifier_type == 'circle':
-            for model in models:
-                center, radius = model[1]
-                circle = plt.Circle(center, radius, color='g', fill=False, linestyle='--', label=f"Circle with radius {radius:.2f}")
-                plt.gca().add_artist(circle)
+            center, radius_point = classifier
+            radius = np.sqrt((radius_point[0] - center[0])**2 + (radius_point[1] - center[1])**2)
+            distance = np.sqrt((data[0] - center[0])**2 + (data[1] - center[1])**2)
+            return 1 if distance <= radius else -1
 
-        plt.xlabel("Feature 1")
-        plt.ylabel("Feature 2")
-        plt.title("Best Hypotheses Visualization")
-        plt.legend()
-        plt.grid(True)
-        plt.axis('equal')
-        plt.show()
+    def aggregate_predictions(self, test_data, classifiers, alphas, classifier_type):
+        """Aggregates predictions from all classifiers for the test data."""
+        final_predictions = []
+        for data in test_data:
+            weighted_sum = sum(alpha * self.predict(classifier, data, classifier_type) for classifier, alpha in zip(classifiers, alphas))
+            final_label = 1 if weighted_sum > 0 else -1
+            final_predictions.append((data, final_label))
+        return final_predictions
+
+    def calculate_accuracy(self, predictions):
+        """Calculates the accuracy of predictions."""
+        correct = sum(1 for data, predicted in predictions if data[2] == predicted)
+        return correct / len(predictions)
+
+    def evaluate_performance(self, test_data, training_data, classifiers, alphas, classifier_type):
+        training_predictions = self.aggregate_predictions(training_data, classifiers, alphas, classifier_type)
+        test_predictions = self.aggregate_predictions(test_data, classifiers, alphas, classifier_type)
+
+        empirical_accuracy = self.calculate_accuracy(training_predictions)
+        true_accuracy = self.calculate_accuracy(test_predictions)
+
+        return 1 - empirical_accuracy, 1 - true_accuracy
