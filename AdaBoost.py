@@ -1,7 +1,8 @@
 # Updated AdaBoost Experiment Implementation
 import numpy as np
 from datetime import datetime
-from AdaBoostService import AdaBoostService  # Adjusted import statement for the service class
+from AdaBoostService import AdaBoostService
+
 
 class AdaBoost:
     def __init__(self):
@@ -12,13 +13,10 @@ class AdaBoost:
         print(f"{current_time} Starting AdaBoost experiment with configurations:")
         print(f"Shape Type: {shape_type}, Total Runs: {total_runs}, Iterations per Run: {iterations}, Visualization: {visualize}")
 
-        # Validate the shape type
         if shape_type not in ['line', 'circle']:
             raise ValueError("Error: shape_type must be 'line' or 'circle'.")
 
-        # Arrays to store summed errors across all runs for averaging later
-        summed_empirical_errors = np.zeros(total_runs)
-        summed_true_errors = np.zeros(total_runs)
+        summed_empirical_errors, summed_true_errors = np.zeros(total_runs), np.zeros(total_runs)
 
         dataset = self.service.load_data(data_path)
         training_data, test_data = self.service.split_dataset(dataset)
@@ -27,9 +25,9 @@ class AdaBoost:
             weights = self.service.initialize_weights(training_data)
             classifiers = self.service.generate_classifiers(training_data, shape_type)
 
-            best_classifiers, alphas, empirical_errors, true_errors = [], [], [], []
+            best_classifiers, alphas = [], []
 
-            for i in range(iterations):
+            for iteration in range(iterations):
                 best_classifier, lowest_error, best_predictions = None, float('inf'), None
 
                 for classifier in classifiers:
@@ -42,39 +40,24 @@ class AdaBoost:
                 alphas.append(alpha)
                 best_classifiers.append(best_classifier)
 
-                # Update weights for the next iteration
-                # Assuming best_predictions is correctly a dictionary mapping data points to their predictions.
                 for i, data in enumerate(training_data):
-                    # Use 'i' to access the corresponding prediction for 'data'
-                    prediction = predictions[i]
+                    prediction = best_predictions[i]
                     label = data[2]
-                    # Calculate the weight update factor
-                    weight_update = np.exp(-alpha * prediction * label)
-                    # Update the weight for the i-th data point
-                    weights[i] *= weight_update
+                    weights[i] *= np.exp(-alpha * prediction * label)
 
-                # Normalize weights after updating all of them
                 weights /= np.sum(weights)
 
-                empirical_error, true_error = self.service.evaluate_performance(test_data, training_data, best_classifiers, alphas, shape_type)
-                empirical_errors.append(empirical_error)
-                true_errors.append(true_error)
+            empirical_error, true_error = self.service.evaluate_performance(test_data, training_data, best_classifiers, alphas, shape_type)
+            summed_empirical_errors[run], summed_true_errors[run] = empirical_error, true_error
 
-            # Sum errors of the last iteration of each run to aggregate
-            summed_empirical_errors[run] = sum(empirical_errors)
-            summed_true_errors[run] = sum(true_errors)
 
-        # Calculate average errors over all runs
-        avg_empirical_error = np.mean(summed_empirical_errors)
-        avg_true_error = np.mean(summed_true_errors)
+            # Print the average errors of the last iteration across all runs
+            for run in range(total_runs):
+                current_time = datetime.now().strftime('%H:%M:%S')
+                print(f"{current_time} Iteration {i+1}: Average Empirical Error = {summed_empirical_errors[run]}, Average True Error = {summed_true_errors[run]}")
 
-        # Print the average errors of the last iteration across all runs
-        for i in range(total_runs):
-            current_time = datetime.now().strftime('%H:%M:%S')
-            print(f"{current_time} Iteration {i+1}: Average Empirical Error = {avg_empirical_error}, Average True Error = {avg_true_error}")
-
-        if visualize:
-            self.service.visualize(dataset, best_classifiers, shape_type)
+            if visualize:
+                self.service.visualize(dataset, best_classifiers, shape_type)
 
 
 
@@ -83,10 +66,10 @@ if __name__ == "__main__":
 
     # Example usage with specified configurations
 
-    shape_type = 'circle'  # line or 'circle'
-    total_runs = 8
-    iterations = 50
+    shape_type = 'line'  # line or 'circle'
+    total_runs = 1
+    iterations = 8
     visualize = True
     
     # Execute 
-    AdaBoost().run_experiment(data_path='circle_separator.txt', shape_type='circle', total_runs=8, iterations=50, visualize=True)
+    AdaBoost().run_experiment(data_path='circle_separator.txt', shape_type=shape_type, total_runs=total_runs, iterations=iterations, visualize=visualize)
