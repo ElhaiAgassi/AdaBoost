@@ -33,16 +33,23 @@ class AdaBoostService:
             # More selective than pairing every point with every other
             return list(combinations(dataset, 2))
 
-    def predict(self, classifier, point, classifier_type):
+    def predict(self, classifier, data, classifier_type):
         if classifier_type == 'line':
             point1, point2 = classifier
-            cross_product = np.cross([point2[0] - point1[0], point2[1] - point1[1]], [point[0] - point1[0], point[1] - point1[1]])
+            cross_product = np.cross([point2[0] - point1[0], point2[1] - point1[1]], [data[0] - point1[0], data[1] - point1[1]])
             return 1 if cross_product > 0 else -1
         elif classifier_type == 'circle':
             center, radius_point = classifier
-            radius = np.linalg.norm(np.array(radius_point) - np.array(center))
-            distance = np.linalg.norm(np.array([point[0], point[1]]) - np.array(center))
+            # Make sure to exclude the label from both the center and radius_point when calculating distances
+            center_coordinates = np.array(center[:2])  # Use only the x, y coordinates
+            radius_point_coordinates = np.array(radius_point[:2])
+            data_coordinates = np.array([data[0], data[1]])
+            
+            radius = np.linalg.norm(radius_point_coordinates - center_coordinates)
+            distance = np.linalg.norm(data_coordinates - center_coordinates)
+            
             return 1 if distance <= radius else -1
+
 
     def evaluate_classifier(self, classifier, weights, dataset, classifier_type):
         predictions = np.array([self.predict(classifier, data, classifier_type) for data in dataset])
