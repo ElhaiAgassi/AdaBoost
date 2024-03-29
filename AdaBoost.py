@@ -117,9 +117,7 @@ class EnhancedAdaBoost:
 if __name__ == "__main__":
     # Example usage with specified configurations
     boost_classifier = EnhancedAdaBoost()
-    current_time = datetime.now().strftime('%H:%M:%S')
-    print(f"{current_time} Starting Enhanced AdaBoost experiment")
-
+   
     # Run configuration
     shape_type = 'circle'  # line or 'circle'
     total_runs = 50
@@ -128,9 +126,14 @@ if __name__ == "__main__":
     visualize = True
     display_hypotheses = False
 
+    current_time = datetime.now().strftime('%H:%M:%S')
+
+    print(f"{current_time} Experiment Configurations - Shape Type: {shape_type}, Total Runs: {total_runs}, Iterations: {iterations}, "
+            f"Verbose: {verbose}, Visualization: {visualize}, Display Hypotheses: {display_hypotheses}")
+
     # Execute 
     empirical_errors, true_errors = boost_classifier.run_experiment(shape_type, total_runs, iterations, verbose, visualize, display_hypotheses)
     
     # Display final averaged results
     for i in range(iterations):
-        print(f'Iteration {i+1}: Average Empirical Error = {empirical_errors[i]}, Average True Error = {true_errors[i]}')
+        print(f'{datetime.now().strftime('%H:%M:%S')} Iteration {i+1}: Average Empirical Error = {empirical_errors[i]}, Average True Error = {true_errors[i]}')
