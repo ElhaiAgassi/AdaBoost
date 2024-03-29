@@ -1,19 +1,20 @@
-from matplotlib import pyplot as plt
 import numpy as np
-from itertools import product
 import random
+from itertools import combinations
+from matplotlib import pyplot as plt
 
-# Re-defining the AdaBoostService with necessary imports
 class AdaBoostService:
     """A utility class providing supporting functions for the AdaBoost classifier."""
+    
+    def __init__(self):
+        pass
 
     def load_data(self, file_path: str) -> list:
         dataset = []
         with open(file_path, 'r') as data_file:
             for line in data_file:
                 x, y, label = line.strip().split()
-                x, y = float(x), float(y)
-                dataset.append((x, y, int(label)))
+                dataset.append((float(x), float(y), int(label)))
         return dataset
 
     def split_dataset(self, dataset: list) -> tuple:
@@ -21,59 +22,58 @@ class AdaBoostService:
         split_point = int(len(dataset) * 0.5)
         return dataset[:split_point], dataset[split_point:]
 
-    def initialize_weights(self, dataset: list) -> dict:
-        initial_weight = 1.0 / len(dataset)
-        return {data: initial_weight for data in dataset}
+    def initialize_weights(self, dataset: list) -> np.ndarray:
+        return np.full(len(dataset), 1.0 / len(dataset))
 
     def generate_classifiers(self, dataset: list, classifier_type: str) -> list:
         if classifier_type == 'line':
-            return list(product(dataset, repeat=2))
+            # Possibly refine this to a more selective approach
+            return list(combinations(dataset, 2))
         elif classifier_type == 'circle':
-            return [(center, point) for center in dataset for point in dataset if center != point]
+            # More selective than pairing every point with every other
+            return list(combinations(dataset, 2))
 
-    def evaluate_classifier(self, classifier, weights, dataset, classifier_type):
-        error, predictions = 0, {}
-        for data in dataset:
-            prediction = self.predict(classifier, data, classifier_type)
-            real_label = data[2]
-            predictions[data] = prediction
-            
-            if prediction != real_label:
-                error += weights[data]
-        return error, predictions
-
-    def predict(self, classifier, data, classifier_type):
+    def predict(self, classifier, point, classifier_type):
         if classifier_type == 'line':
             point1, point2 = classifier
-            cross_product = np.cross([point2[0] - point1[0], point2[1] - point1[1]], [data[0] - point1[0], data[1] - point1[1]])
+            cross_product = np.cross([point2[0] - point1[0], point2[1] - point1[1]], [point[0] - point1[0], point[1] - point1[1]])
             return 1 if cross_product > 0 else -1
         elif classifier_type == 'circle':
             center, radius_point = classifier
             radius = np.linalg.norm(np.array(radius_point) - np.array(center))
-            distance = np.linalg.norm(np.array(data) - np.array(center))
+            distance = np.linalg.norm(np.array([point[0], point[1]]) - np.array(center))
             return 1 if distance <= radius else -1
 
-    def aggregate_predictions(self, test_data, classifiers, alphas, classifier_type):
-        weighted_sums = np.zeros(len(test_data))
-        for classifier, alpha in zip(classifiers, alphas):
-            predictions = np.array([self.predict(classifier, data, classifier_type) for data in test_data])
-            weighted_sums += alpha * predictions
+    def evaluate_classifier(self, classifier, weights, dataset, classifier_type):
+        predictions = np.array([self.predict(classifier, data, classifier_type) for data in dataset])
+        labels = np.array([data[2] for data in dataset])
+        weighted_errors = weights * (predictions != labels)
+        return np.sum(weighted_errors), predictions
 
-        final_labels = np.sign(weighted_sums)
-        return [(data, label) for data, label in zip(test_data, final_labels)]
+    def update_weights(self, weights, predictions, labels, alpha):
+        weights *= np.exp(-alpha * predictions * labels)
+        weights /= np.sum(weights)  # Normalize
+        return weights
 
-    def calculate_accuracy(self, predictions):
-        correct = sum(1 for data, predicted in predictions if data[2] == predicted)
-        return correct / len(predictions)
+    def aggregate_predictions(self, dataset, classifiers, alphas, classifier_type):
+        final_predictions = np.zeros(len(dataset))
+        for alpha, classifier in zip(alphas, classifiers):
+            predictions = np.array([self.predict(classifier, data, classifier_type) for data in dataset])
+            final_predictions += alpha * predictions
+        return np.sign(final_predictions)
 
     def evaluate_performance(self, test_data, training_data, classifiers, alphas, classifier_type):
+        training_labels = np.array([data[2] for data in training_data])
+        test_labels = np.array([data[2] for data in test_data])
+        
         training_predictions = self.aggregate_predictions(training_data, classifiers, alphas, classifier_type)
         test_predictions = self.aggregate_predictions(test_data, classifiers, alphas, classifier_type)
+        
+        empirical_error = np.mean(training_predictions != training_labels)
+        true_error = np.mean(test_predictions != test_labels)
+        
+        return empirical_error, true_error
 
-        empirical_accuracy = self.calculate_accuracy(training_predictions)
-        true_accuracy = self.calculate_accuracy(test_predictions)
-
-        return 1 - empirical_accuracy, 1 - true_accuracy
 
     def visualize(self, dataset, classifiers, classifier_type):
         # Convert dataset to a NumPy array for easier indexing
