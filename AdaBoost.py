@@ -43,13 +43,18 @@ class AdaBoost:
                 best_classifiers.append(best_classifier)
 
                 # Update weights for the next iteration
-                for data in training_data:
-                    weight_update = np.exp(-alpha * best_predictions[data] * data[2])
-                    weights[data] *= weight_update
+                # Assuming best_predictions is correctly a dictionary mapping data points to their predictions.
+                for i, data in enumerate(training_data):
+                    # Use 'i' to access the corresponding prediction for 'data'
+                    prediction = predictions[i]
+                    label = data[2]
+                    # Calculate the weight update factor
+                    weight_update = np.exp(-alpha * prediction * label)
+                    # Update the weight for the i-th data point
+                    weights[i] *= weight_update
 
-                # Normalize weights
-                normalization_factor = sum(weights.values())
-                weights = {data: weight / normalization_factor for data, weight in weights.items()}
+                # Normalize weights after updating all of them
+                weights /= np.sum(weights)
 
                 empirical_error, true_error = self.service.evaluate_performance(test_data, training_data, best_classifiers, alphas, shape_type)
                 empirical_errors.append(empirical_error)
