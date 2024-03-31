@@ -121,6 +121,8 @@ Average Test Error (across all runs): 0.2345
 ```
 
 - Visualization of the learned classifiers (if enabled).
+For example:
+![alt text](image.png)
 
 ## Customization
 
