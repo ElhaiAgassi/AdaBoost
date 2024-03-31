@@ -1,101 +1,81 @@
+from matplotlib import pyplot as plt
 import numpy as np
 import random
 from itertools import combinations
-from matplotlib import pyplot as plt
 
-class AdaBoostService:
-    """A utility class providing supporting functions for the AdaBoost classifier."""
-    
+class AdaboostService:
     def __init__(self):
         pass
 
-    def load_data(self, file_path: str) -> list:
-        dataset = []
-        with open(file_path, 'r') as data_file:
-            for line in data_file:
-                x, y, label = line.strip().split()
-                dataset.append((float(x), float(y), int(label)))
-        return dataset
+    def fetch_dataset(self, file_path: str) -> list:
+        data = []
+        with open(file_path, 'r') as file:
+            for line in file:
+                features = line.strip().split()
+                data.append((float(features[0]), float(features[1]), int(features[2])))
+        return data
 
-    def split_dataset(self, dataset: list) -> tuple:
+    def split_data(self, dataset: list) -> tuple:
         random.shuffle(dataset)
-        split_point = int(len(dataset) * 0.5)
-        return dataset[:split_point], dataset[split_point:]
+        midpoint = int(len(dataset) * 0.5)
+        return dataset[:midpoint], dataset[midpoint:]
 
-    def initialize_weights(self, dataset: list) -> np.ndarray:
-        return np.full(len(dataset), 1.0 / len(dataset))
+    def set_initial_weights(self, data_points: list) -> dict:
+        weight = 1.0 / len(data_points)
+        return {point: weight for point in data_points}
 
-    def generate_classifiers(self, dataset: list, classifier_type: str) -> list:
-        if classifier_type == 'line':
-            # Possibly refine this to a more selective approach
-            return list(combinations(dataset, 2))
-        elif classifier_type == 'circle':
-            # More selective than pairing every point with every other
-            return list(combinations(dataset, 2))
+    def craft_hypotheses(self, data_points: list):
+        return list(combinations(data_points, 2))
 
-    def predict(self, classifier, data, classifier_type):
-        if classifier_type == 'line':
-            point1, point2 = classifier
-            cross_product = np.cross([point2[0] - point1[0], point2[1] - point1[1]], [data[0] - point1[0], data[1] - point1[1]])
-            return 1 if cross_product > 0 else -1
-        elif classifier_type == 'circle':
-            center, radius_point = classifier
-            # Make sure to exclude the label from both the center and radius_point when calculating distances
-            center_coordinates = np.array(center[:2])  # Use only the x, y coordinates
-            radius_point_coordinates = np.array(radius_point[:2])
-            data_coordinates = np.array([data[0], data[1]])
-            
-            radius = np.linalg.norm(radius_point_coordinates - center_coordinates)
-            distance = np.linalg.norm(data_coordinates - center_coordinates)
-            
+    def evaluate_hypothesis(self, hypothesis, weights, data_points, shape):
+        error = 0
+        predictions = {}
+        for point in data_points:
+            guess = self.make_prediction(hypothesis, point, shape)
+            predictions[point] = guess
+            if guess != point[2]:
+                error += weights[point]
+        return error, predictions
+
+    def make_prediction(self, hypothesis, point, shape):
+        if shape == 'line':
+            determinant = (hypothesis[1][0] - hypothesis[0][0]) * (point[1] - hypothesis[0][1]) - \
+                          (hypothesis[1][1] - hypothesis[0][1]) * (point[0] - hypothesis[0][0])
+            return 1 if determinant > 0 else -1
+        elif shape == 'circle':
+            radius = np.sqrt((hypothesis[1][0] - hypothesis[0][0])**2 + (hypothesis[1][1] - hypothesis[0][1])**2)
+            distance = np.sqrt((point[0] - hypothesis[0][0])**2 + (point[1] - hypothesis[0][1])**2)
             return 1 if distance <= radius else -1
 
+    def validate_model(self, test_data, top_hypotheses, alphas, shape):
+        predictions = []
+        for point in test_data:
+            weighted_sum = sum(alpha * self.make_prediction(hypothesis, point, shape) 
+                               for hypothesis, alpha in zip(top_hypotheses, alphas))
+            prediction = 1 if weighted_sum > 0 else -1
+            predictions.append((point, prediction))
+        return predictions
 
-    def evaluate_classifier(self, classifier, weights, dataset, classifier_type):
-        predictions = np.array([self.predict(classifier, data, classifier_type) for data in dataset])
-        labels = np.array([data[2] for data in dataset])
-        weighted_errors = weights * (predictions != labels)
-        return np.sum(weighted_errors), predictions
-
-    def update_weights(self, weights, predictions, labels, alpha):
-        weights *= np.exp(-alpha * predictions * labels)
-        weights /= np.sum(weights)  # Normalize
-        return weights
-
-    def aggregate_predictions(self, dataset, classifiers, alphas, classifier_type):
-        final_predictions = np.zeros(len(dataset))
-        for alpha, classifier in zip(alphas, classifiers):
-            predictions = np.array([self.predict(classifier, data, classifier_type) for data in dataset])
-            final_predictions += alpha * predictions
-        return np.sign(final_predictions)
-
-    def evaluate_performance(self, test_data, training_data, classifiers, alphas, classifier_type):
-        training_labels = np.array([data[2] for data in training_data])
-        test_labels = np.array([data[2] for data in test_data])
-        
-        training_predictions = self.aggregate_predictions(training_data, classifiers, alphas, classifier_type)
-        test_predictions = self.aggregate_predictions(test_data, classifiers, alphas, classifier_type)
-        
-        empirical_error = np.mean(training_predictions != training_labels)
-        true_error = np.mean(test_predictions != test_labels)
-        
-        return empirical_error, true_error
-
-
+    def calculate_model_accuracy(self, predictions):
+        correct_predictions = sum(1 for point, prediction in predictions if prediction == point[2])
+        return correct_predictions / len(predictions)
+    
     def visualize(self, dataset, classifiers, classifier_type):
+        # Set the figure size for the canvas
+        plt.figure(figsize=(8, 6))  # You can adjust the width and height as needed
+
         # Convert dataset to a NumPy array for easier indexing
         dataset_np = np.array(dataset)
 
-        # First, plot the dataset points
+        # First, plot the dataset points with smaller dots
         for point in dataset_np:
-            plt.scatter(point[0], point[1], color='red' if point[2] == 1 else 'blue')
+            plt.scatter(point[0], point[1], color='red' if point[2] == 1 else 'blue', s=10)  # Adjust the size with `s`
 
         # Now plot the classifiers based on type
         if classifier_type == 'line':
             for classifier in classifiers:
                 point1, point2 = classifier
-                # Handle the case for vertical lines to avoid division by zero
-                if point1[0] == point2[0]:
+                if point1[0] == point2[0]:  # Vertical line case
                     plt.axvline(x=point1[0], color='green')
                 else:
                     slope = (point2[1] - point1[1]) / (point2[0] - point1[0])
@@ -115,4 +95,3 @@ class AdaBoostService:
         plt.title(f'AdaBoost Classification with {classifier_type}')
         plt.gca().set_aspect('equal', adjustable='box')  # Keep the aspect ratio square
         plt.show()
-
