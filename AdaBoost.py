@@ -1,11 +1,12 @@
 
 import numpy as np
-from AdaBoostService import AdaBoostService
+
+from AdaBoostService import AdaboostService
 
 
 class AdaBoost:
     def __init__(self):
-        self.utility = AdaBoostService()
+        self.utility = AdaboostService()
 
     def execute_adaboost(self, shape_type, num_iterations,  visualize):
         data_processing = self.utility  # Streamlining method calls
@@ -64,9 +65,9 @@ if __name__ == "__main__":
     AdaBoost = AdaBoost()
     
     # Configuration for the experiment
-    total_runs = 50
+    total_runs = 10
     iterations_per_run = 8
-    classifier_shape = 'circle'  # Change to 'line' for line classifiers
+    classifier_shape = 'line'  # Choose 'line' or 'circel' classifiers
     dataset_path = 'circle_separator.txt'
     visualize = True
 
