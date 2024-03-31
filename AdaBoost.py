@@ -65,12 +65,16 @@ if __name__ == "__main__":
     AdaBoost = AdaBoost()
     
     # Configuration for the experiment
-    total_runs = 10
+    total_runs = 50
     iterations_per_run = 8
     classifier_shape = 'line'  # Choose 'line' or 'circel' classifiers
     dataset_path = 'circle_separator.txt'
     visualize = True
 
+    print(f"Running AdaBoost with total_runs={total_runs}, iterations_per_run={iterations_per_run}, "
+          f"classifier_shape='{classifier_shape}', dataset_path='{dataset_path}', "
+          f"visualize={'Yes' if visualize else 'No'}")
+    
     # Aggregate error metrics
     aggregated_training_error = aggregated_test_error = 0 
     average_training_errors_per_iteration = np.zeros(iterations_per_run)
