@@ -122,7 +122,8 @@ Average Test Error (across all runs): 0.2345
 
 - Visualization of the learned classifiers (if enabled).
 For example:
-![alt text](image.png)
+![image](https://github.com/ElhaiAgassi/AdaBoost/assets/70665375/06453a09-adc4-4a44-9c9b-83e061712938)
+
 
 ## Customization
 
